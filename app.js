@@ -47,17 +47,20 @@
     ? haversineKm(state.coords.lat, state.coords.lng, r.lat, r.lng)
     : null;
 
+  /* PRIMARY deep-link: Forces the map to center EXACTLY on the user's GPS 
+     coordinates, zoomed in closely (14z). Google will drop pins for all 
+     branches of the restaurant right around them, making it obvious which is closest. */
   function nearestHref(r) {
     if (isPinned(r)) {
       return `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`;
     }
     if (state.coords) {
-      return `https://www.google.com/maps/dir/?api=1&origin=${state.coords.lat},${state.coords.lng}` +
-             `&destination=${encodeURIComponent(r.name)}`;
+      return `https://www.google.com/maps/search/${encodeURIComponent(r.name)}/@${state.coords.lat},${state.coords.lng},14z`;
     }
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${r.name} restaurant, ${CITY_HINT}`)}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.name} restaurant, ${CITY_HINT}`)}`;
   }
 
+  /* SECONDARY deep-link: Standard search for all branches in the whole city. */
   function allHref(r) {
     const q = state.coords
       ? `${r.name} near ${state.coords.lat},${state.coords.lng}`
@@ -142,7 +145,7 @@
       .filter(([r]) => {
         if (state.cuisine !== 'All' && (r.cuisine || 'Other') !== state.cuisine) return false;
         if (!q) return true;
-        return [r.name, r.cuisine, r.dish, r.area, r.note]
+        return [r.name, r.cuisine, r.area]
           .filter(Boolean).join(' ').toLowerCase().includes(q);
       });
     if (state.sort === 'nearest' && state.coords) {
@@ -154,7 +157,7 @@
   function cardHTML(r, i) {
     const dist = distOf(r);
     const pinned = isPinned(r);
-    const cta = pinned ? 'Directions to this branch' : 'Take me to the nearest branch';
+    const cta = pinned ? 'Directions to this branch' : 'Show nearby branches';
     const distTag = dist != null
       ? `<span class="tag tag-dist">📍 ${dist < 1 ? Math.round(dist * 1000) + ' m' : dist.toFixed(1) + ' km'}</span>`
       : '';
@@ -166,7 +169,6 @@
           <span class="cuisine">${esc(r.cuisine || 'Other')}</span>
         </span>
         <span class="name">${esc(r.name)}</span>
-        ${r.dish ? `<span class="dish">${esc(r.dish)}</span>` : ''}
         ${r.area ? `<span class="area">📍 ${esc(r.area)}</span>` : ''}
         <span class="card-foot">
           <a class="cta" href="${nearestHref(r)}" target="_blank" rel="noopener noreferrer">${cta}<span class="arrow">↗</span></a>
