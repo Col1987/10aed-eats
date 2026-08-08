@@ -230,3 +230,12 @@ footer code { background: #2b241c; padding: .1rem .4rem; border-radius: 4px; col
   .reveal { opacity: 1; transform: none; transition: none; }
   * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+/* ============ stretched primary link + secondary link ============ */
+.cta::after { content: ""; position: absolute; inset: 0; }  /* whole card taps = nearest branch */
+.alt {
+  position: relative; z-index: 2;
+  font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink); text-decoration: underline; text-underline-offset: 3px;
+}
+.alt:hover { color: var(--coral-deep); }
+.cta:focus-visible, .alt:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
