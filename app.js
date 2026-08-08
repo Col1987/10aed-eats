@@ -20,17 +20,15 @@
   };
 
   const STORAGE_KEY = 'dss10.coords';
-  const FRESH_MS = 30 * 60 * 1000; // reuse a session fix for 30 minutes
+  const FRESH_MS = 30 * 60 * 1000;
 
   const state = {
     coords: restoreCoords(),
-    status: 'idle',   // idle | locating | ready | denied | failed | insecure | unsupported
+    status: 'idle',
     q: '',
     cuisine: 'All',
-    sort: 'featured', // featured | nearest
+    sort: 'featured',
   };
-
-  /* ---------------- helpers ---------------- */
 
   const esc = (s = '') => String(s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -49,11 +47,6 @@
     ? haversineKm(state.coords.lat, state.coords.lng, r.lat, r.lng)
     : null;
 
-  /* PRIMARY deep-link: the DIRECTIONS endpoint. Given an origin (the user's
-     coordinates), Google resolves a chain name to the single branch that
-     makes sense from that point — i.e. the nearest one — and draws the route.
-     Without coordinates we omit origin and let Google estimate the user's
-     position, which still biases to the nearest branch. */
   function nearestHref(r) {
     if (isPinned(r)) {
       return `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`;
@@ -65,8 +58,6 @@
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${r.name} restaurant, ${CITY_HINT}`)}`;
   }
 
-  /* SECONDARY deep-link: the SEARCH endpoint — the full list of branches,
-     for users who want to choose manually. */
   function allHref(r) {
     const q = state.coords
       ? `${r.name} near ${state.coords.lat},${state.coords.lng}`
@@ -85,8 +76,6 @@
   }
   function saveCoords(c) { try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(c)); } catch (_) {} }
 
-  /* ---------------- geolocation ---------------- */
-
   function locate() {
     if (!('geolocation' in navigator)) return setStatus('unsupported');
     if (!window.isSecureContext)       return setStatus('insecure');
@@ -101,7 +90,7 @@
         saveCoords(state.coords);
         setStatus('ready');
         renderSortBtn();
-        renderList(); // refresh hrefs so they now carry coordinates
+        renderList();
       },
       err => setStatus(err.code === err.PERMISSION_DENIED ? 'denied' : 'failed'),
       { enableHighAccuracy: false, timeout: 9000, maximumAge: 120000 }
@@ -117,7 +106,7 @@
         dot = 'dot-ok';
         text = `Ready · nearest-first is on · ${state.coords.lat.toFixed(3)}, ${state.coords.lng.toFixed(3)}`;
         break;
-      case 'locating':    dot = 'dot-busy';  text = 'Finding you…'; break;
+      case 'locating':    dot = 'dot-busy';  text = 'Finding you...'; break;
       case 'denied':      text = 'Location blocked — Maps will estimate instead'; btn = 'Retry'; break;
       case 'failed':      text = "Couldn't get a fix — Maps will estimate instead"; btn = 'Retry'; break;
       case 'insecure':    text = 'Location needs HTTPS — Maps will estimate instead'; break;
@@ -133,7 +122,140 @@
     if (e.target.closest('button')) locate();
   });
 
-  // If someone taps a card before granting location, request it in the
-  // background — the link still opens immediately with the fallback query.
   els.list.addEventListener('click', () => {
     if (['idle', 'denied', 'failed'].includes(state.status)) locate();
+  });
+
+  function cuisines() {
+    const m = new Map();
+    RESTAURANTS.forEach(r => {
+      const c = r.cuisine || 'Other';
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  function filtered() {
+    const q = state.q.trim().toLowerCase();
+    let rows = RESTAURANTS
+      .map((r, i) => [r, i])
+      .filter(([r]) => {
+        if (state.cuisine !== 'All' && (r.cuisine || 'Other') !== state.cuisine) return false;
+        if (!q) return true;
+        return [r.name, r.cuisine, r.dish, r.area, r.note]
+          .filter(Boolean).join(' ').toLowerCase().includes(q);
+      });
+    if (state.sort === 'nearest' && state.coords) {
+      rows.sort((a, b) => (distOf(a[0]) ?? Infinity) - (distOf(b[0]) ?? Infinity));
+    }
+    return rows;
+  }
+
+  function cardHTML(r, i) {
+    const dist = distOf(r);
+    const pinned = isPinned(r);
+    const cta = pinned ? 'Directions to this branch' : 'Take me to the nearest branch';
+    const distTag = dist != null
+      ? `<span class="tag tag-dist">📍 ${dist < 1 ? Math.round(dist * 1000) + ' m' : dist.toFixed(1) + ' km'}</span>`
+      : '';
+    return `
+    <li class="reveal">
+      <article class="card">
+        <span class="card-head">
+          <span class="num">${String(i + 1).padStart(2, '0')}</span>
+          <span class="cuisine">${esc(r.cuisine || 'Other')}</span>
+        </span>
+        <span class="name">${esc(r.name)}</span>
+        ${r.dish ? `<span class="dish">${esc(r.dish)}</span>` : ''}
+        ${r.area ? `<span class="area">📍 ${esc(r.area)}</span>` : ''}
+        <span class="card-foot">
+          <a class="cta" href="${nearestHref(r)}" target="_blank" rel="noopener noreferrer">${cta}<span class="arrow">↗</span></a>
+          <a class="alt" href="${allHref(r)}" target="_blank" rel="noopener noreferrer">All branches</a>
+          ${distTag}
+        </span>
+      </article>
+    </li>`;
+  }
+
+  let io;
+  function observeReveals() {
+    if (io) io.disconnect();
+    const items = [...document.querySelectorAll('.reveal')];
+    if (!('IntersectionObserver' in window)) {
+      items.forEach(el => el.classList.add('in'));
+      return;
+    }
+    io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08 });
+    items.forEach((el, idx) => {
+      el.style.transitionDelay = `${Math.min(idx, 8) * 45}ms`;
+      io.observe(el);
+    });
+  }
+
+  function renderList() {
+    const rows = filtered();
+    els.count.textContent = `${rows.length} ${rows.length === 1 ? 'spot' : 'spots'}`;
+    els.empty.hidden = rows.length > 0;
+
+    if (rows.length === 0) {
+      els.emptyMsg.innerHTML = (state.q || state.cuisine !== 'All')
+        ? `Nothing on the list for "${esc(state.q || state.cuisine)}" — try another craving.`
+        : 'Your list is empty — add restaurants to <code>restaurants.js</code>.';
+    }
+
+    els.list.innerHTML = rows.map(([r, i]) => cardHTML(r, i)).join('');
+    observeReveals();
+  }
+
+  function renderChips() {
+    const chip = (c, n) =>
+      `<button type="button" class="chip${state.cuisine === c ? ' active' : ''}" data-cuisine="${esc(c)}">${esc(c)}<small>${n}</small></button>`;
+    els.chips.innerHTML =
+      chip('All', RESTAURANTS.length) + cuisines().map(([c, n]) => chip(c, n)).join('');
+  }
+
+  els.chips.addEventListener('click', e => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    state.cuisine = btn.dataset.cuisine;
+    renderChips();
+    renderList();
+  });
+
+  let deb;
+  els.search.addEventListener('input', () => {
+    clearTimeout(deb);
+    deb = setTimeout(() => { state.q = els.search.value; renderList(); }, 120);
+  });
+
+  els.clearBtn.addEventListener('click', () => {
+    state.q = ''; state.cuisine = 'All';
+    els.search.value = '';
+    renderChips(); renderList();
+    els.search.focus();
+  });
+
+  function renderSortBtn() {
+    const anyPinned = RESTAURANTS.some(isPinned);
+    els.sortBtn.hidden = !(state.coords && anyPinned);
+    els.sortBtn.textContent = state.sort === 'nearest' ? '★ Sorting: nearest first' : 'Sort: nearest first';
+  }
+  els.sortBtn.addEventListener('click', () => {
+    state.sort = state.sort === 'nearest' ? 'featured' : 'nearest';
+    renderSortBtn(); renderList();
+  });
+
+  els.statRest.textContent = RESTAURANTS.length;
+  els.statCuis.textContent = cuisines().length;
+  els.year.textContent = new Date().getFullYear();
+
+  if (state.coords) state.status = 'ready';
+  renderPill();
+  renderChips();
+  renderSortBtn();
+  renderList();
+})();
