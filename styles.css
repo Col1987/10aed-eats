@@ -239,3 +239,6 @@ footer code { background: #2b241c; padding: .1rem .4rem; border-radius: 4px; col
 }
 .alt:hover { color: var(--coral-deep); }
 .cta:focus-visible, .alt:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+
+/* breathing room between footer paragraphs */
+footer p + p { margin-top: .9rem; }
