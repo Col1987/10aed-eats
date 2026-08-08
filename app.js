@@ -220,10 +220,14 @@
       chip('All', RESTAURANTS.length) + cuisines().map(([c, n]) => chip(c, n)).join('');
   }
 
+ // Search and cuisine filter are standalone modes:
+  // using one resets the other, so results always match what you touched last.
   els.chips.addEventListener('click', e => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
     state.cuisine = btn.dataset.cuisine;
+    state.q = '';
+    els.search.value = '';
     renderChips();
     renderList();
   });
@@ -231,7 +235,14 @@
   let deb;
   els.search.addEventListener('input', () => {
     clearTimeout(deb);
-    deb = setTimeout(() => { state.q = els.search.value; renderList(); }, 120);
+    deb = setTimeout(() => {
+      state.q = els.search.value;
+      if (state.q && state.cuisine !== 'All') {
+        state.cuisine = 'All';   // search looks across ALL cuisines
+        renderChips();
+      }
+      renderList();
+    }, 120);
   });
 
   els.clearBtn.addEventListener('click', () => {
