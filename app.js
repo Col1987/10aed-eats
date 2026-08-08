@@ -47,9 +47,11 @@
     ? haversineKm(state.coords.lat, state.coords.lng, r.lat, r.lng)
     : null;
 
-  /* PRIMARY deep-link: Forces the map to center EXACTLY on the user's GPS 
-     coordinates, zoomed in closely (14z). Google will drop pins for all 
-     branches of the restaurant right around them, making it obvious which is closest. */
+  /* The one and only deep-link: forces Google Maps to open centred exactly on
+     the user's GPS coordinates, zoomed in closely (14z). Google then drops
+     pins for the restaurant's branches right around them; the user taps the
+     closest pin for directions. (True auto-nearest routing requires the paid
+     Places API — a known, accepted limitation of the free stack.) */
   function nearestHref(r) {
     if (isPinned(r)) {
       return `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`;
@@ -58,14 +60,6 @@
       return `https://www.google.com/maps/search/${encodeURIComponent(r.name)}/@${state.coords.lat},${state.coords.lng},14z`;
     }
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.name} restaurant, ${CITY_HINT}`)}`;
-  }
-
-  /* SECONDARY deep-link: Standard search for all branches in the whole city. */
-  function allHref(r) {
-    const q = state.coords
-      ? `${r.name} near ${state.coords.lat},${state.coords.lng}`
-      : `${r.name} restaurant, ${CITY_HINT}`;
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   }
 
   function restoreCoords() {
@@ -107,14 +101,14 @@
     switch (state.status) {
       case 'ready':
         dot = 'dot-ok';
-        text = `Ready · nearest-first is on · ${state.coords.lat.toFixed(3)}, ${state.coords.lng.toFixed(3)}`;
+        text = `Ready · map centres on you · ${state.coords.lat.toFixed(3)}, ${state.coords.lng.toFixed(3)}`;
         break;
       case 'locating':    dot = 'dot-busy';  text = 'Finding you...'; break;
-      case 'denied':      text = 'Location blocked — Maps will estimate instead'; btn = 'Retry'; break;
-      case 'failed':      text = "Couldn't get a fix — Maps will estimate instead"; btn = 'Retry'; break;
-      case 'insecure':    text = 'Location needs HTTPS — Maps will estimate instead'; break;
-      case 'unsupported': text = 'This browser has no location — Maps will estimate instead'; break;
-      default:            dot = 'dot-idle'; text = 'Location off — enable it for nearest branches'; btn = 'Enable location';
+      case 'denied':      text = 'Location blocked — showing city-wide results'; btn = 'Retry'; break;
+      case 'failed':      text = "Couldn't get a fix — showing city-wide results"; btn = 'Retry'; break;
+      case 'insecure':    text = 'Location needs HTTPS — showing city-wide results'; break;
+      case 'unsupported': text = 'No location support — showing city-wide results'; break;
+      default:            dot = 'dot-idle'; text = 'Location off — enable to see branches around you'; btn = 'Enable location';
     }
     els.pill.innerHTML =
       `<span class="dot ${dot}"></span><span>${text}</span>` +
@@ -172,7 +166,6 @@
         ${r.area ? `<span class="area">📍 ${esc(r.area)}</span>` : ''}
         <span class="card-foot">
           <a class="cta" href="${nearestHref(r)}" target="_blank" rel="noopener noreferrer">${cta}<span class="arrow">↗</span></a>
-          <a class="alt" href="${allHref(r)}" target="_blank" rel="noopener noreferrer">All branches</a>
           ${distTag}
         </span>
       </article>
@@ -205,7 +198,7 @@
 
     if (rows.length === 0) {
       els.emptyMsg.innerHTML = (state.q || state.cuisine !== 'All')
-        ? `Nothing on the list for "${esc(state.q || state.cuisine)}" — try another craving.`
+        ? `Nothing on the list for "${esc(state.q || state.cuisine)}" — try another search.`
         : 'Your list is empty — add restaurants to <code>restaurants.js</code>.';
     }
 
@@ -220,7 +213,7 @@
       chip('All', RESTAURANTS.length) + cuisines().map(([c, n]) => chip(c, n)).join('');
   }
 
- // Search and cuisine filter are standalone modes:
+  // Search and cuisine filter are standalone modes:
   // using one resets the other, so results always match what you touched last.
   els.chips.addEventListener('click', e => {
     const btn = e.target.closest('.chip');
