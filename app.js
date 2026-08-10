@@ -47,11 +47,11 @@
     ? haversineKm(state.coords.lat, state.coords.lng, r.lat, r.lng)
     : null;
 
-  /* The one and only deep-link: forces Google Maps to open centred exactly on
-     the user's GPS coordinates, zoomed in closely (14z). Google then drops
-     pins for the restaurant's branches right around them; the user taps the
-     closest pin for directions. (True auto-nearest routing requires the paid
-     Places API — a known, accepted limitation of the free stack.) */
+  /* The one and only deep-link. Multi-branch chains: Google Maps opens
+     centred on the user's GPS with branch pins around them. Single-location
+     spots: Google resolves the unique result and lands on the restaurant,
+     one tap from directions. (True auto-nearest routing requires the paid
+     Places API: a known, accepted limitation of the free stack.) */
   function nearestHref(r) {
     if (isPinned(r)) {
       return `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lng}`;
@@ -101,14 +101,14 @@
     switch (state.status) {
       case 'ready':
         dot = 'dot-ok';
-        text = `Ready · map centres on you · ${state.coords.lat.toFixed(3)}, ${state.coords.lng.toFixed(3)}`;
+        text = `Ready · maps tuned to your location · ${state.coords.lat.toFixed(3)}, ${state.coords.lng.toFixed(3)}`;
         break;
       case 'locating':    dot = 'dot-busy';  text = 'Finding you...'; break;
-      case 'denied':      text = 'Location blocked — showing city-wide results'; btn = 'Retry'; break;
-      case 'failed':      text = "Couldn't get a fix — showing city-wide results"; btn = 'Retry'; break;
-      case 'insecure':    text = 'Location needs HTTPS — showing city-wide results'; break;
-      case 'unsupported': text = 'No location support — showing city-wide results'; break;
-      default:            dot = 'dot-idle'; text = 'Location off — enable to see branches around you'; btn = 'Enable location';
+      case 'denied':      text = 'Location blocked, showing city-wide results'; btn = 'Retry'; break;
+      case 'failed':      text = "Couldn't get a fix, showing city-wide results"; btn = 'Retry'; break;
+      case 'insecure':    text = 'Location needs HTTPS, showing city-wide results'; break;
+      case 'unsupported': text = 'No location support, showing city-wide results'; break;
+      default:            dot = 'dot-idle'; text = "Location off. Enable it to see what's near you"; btn = 'Enable location';
     }
     els.pill.innerHTML =
       `<span class="dot ${dot}"></span><span>${text}</span>` +
@@ -151,7 +151,7 @@
   function cardHTML(r, i) {
     const dist = distOf(r);
     const pinned = isPinned(r);
-    const cta = pinned ? 'Directions to this branch' : 'Show nearby branches';
+    const cta = pinned ? 'Directions to this branch' : 'Show on Maps';
     const distTag = dist != null
       ? `<span class="tag tag-dist">📍 ${dist < 1 ? Math.round(dist * 1000) + ' m' : dist.toFixed(1) + ' km'}</span>`
       : '';
