@@ -198,8 +198,8 @@
 
     if (rows.length === 0) {
       els.emptyMsg.innerHTML = (state.q || state.cuisine !== 'All')
-        ? `Nothing on the list for "${esc(state.q || state.cuisine)}" — try another search.`
-        : 'Your list is empty — add restaurants to <code>restaurants.js</code>.';
+        ? `Nothing on the list for "${esc(state.q || state.cuisine)}". Try another search.`
+        : 'Your list is empty. Add restaurants in <code>restaurants.js</code>.';
     }
 
     els.list.innerHTML = rows.map(([r, i]) => cardHTML(r, i)).join('');
